@@ -53,6 +53,7 @@ def create_user():
 		abort(400)
 	user = User(username=username)
 	user.hash_password(password)
+	user.room = Room.query.filter_by(id=1).first()
 	db.session.add(user)
 	db.session.commit()
 	return(jsonify({'username': user.username}), 201, {'Location': url_for('get_user', id=user.id, _external=True)})
@@ -71,6 +72,11 @@ def get_userid(username):
 		abort(400)
 	return jsonify({'id': user.id})
 
+@app.route('/look')
+@auth.login_required
+def get_current_room():
+	return jsonify({'room_id': g.user.room.id, 'room_name': g.user.room.name, 'room_description': g.user.room.description})
+
 @app.route('/resource')
 @auth.login_required
 def get_resource():
@@ -85,4 +91,6 @@ if __name__ == "__main__":
 		db.create_all()
 	if not Room.query.filter_by(id=1).first():
 		room = Room(name="The Entrance", description="You are at the entrance to a very creepy dungeon.  You feel as though coming here may not have been a great idea.")
+		db.session.add(room)
+		db.session.commit()
 	app.run(host='0.0.0.0')
