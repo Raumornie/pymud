@@ -18,12 +18,21 @@ class User(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
 	username = db.Column(db.String(32), index=True)
 	password_hash = db.Column(db.String(64))
+	room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
+	room = db.relationship("Room", back_populates="players")
 
 	def hash_password(self, password):
 		self.password_hash = pwd_context.encrypt(password)
 
 	def verify_password(self, password):
 		return pwd_context.verify(password, self.password_hash)
+
+class Room(db.Model):
+	__tablename__='rooms'
+	id = db.Column(db.Integer, primary_key=True)
+	name = db.Column(db.String(64))
+	description = db.Column(db.Text)
+	players = db.relationship("User", order_by=User.id, back_populates="room")
 
 
 @auth.verify_password
@@ -74,4 +83,6 @@ def hello():
 if __name__ == "__main__":
 	if not os.path.exists('db.sqlite'):
 		db.create_all()
+	if not Room.query.filter_by(id=1).first():
+		room = Room(name="The Entrance", description="You are at the entrance to a very creepy dungeon.  You feel as though coming here may not have been a great idea.")
 	app.run(host='0.0.0.0')
