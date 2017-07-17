@@ -18,8 +18,8 @@ class User(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
 	username = db.Column(db.String(32), index=True)
 	password_hash = db.Column(db.String(64))
-	room_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
-	room = db.relationship("Room", back_populates="players")
+	location_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
+	location = db.relationship("Room", back_populates="players")
 
 	def hash_password(self, password):
 		self.password_hash = pwd_context.encrypt(password)
@@ -32,7 +32,18 @@ class Room(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
 	name = db.Column(db.String(64))
 	description = db.Column(db.Text)
-	players = db.relationship("User", order_by=User.id, back_populates="room")
+	players = db.relationship("User", order_by=User.id, back_populates="location")
+	exits = db.relationship("Exit", order_by=Exit.id, back_populates="source")
+	entrances = db.relationship("Exit", order_by=Exit.id, back_populates="destination")
+
+class Exit(db.Model):
+	__tablename__='exits'
+	id = db.Column(db.Integer, primary_key=True)
+	direction = db.Column(db.string(16))
+	source_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
+	destination_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
+	source = db.relationship("Room", back_populates="exits")
+	destination = db.relationship("Room", back_populates="entrances")
 
 
 @auth.verify_password
@@ -53,10 +64,10 @@ def create_user():
 		abort(400)
 	user = User(username=username)
 	user.hash_password(password)
-	user.room = Room.query.filter_by(id=1).first()
+	user.location = Room.query.filter_by(id=1).first()
 	db.session.add(user)
 	db.session.commit()
-	return(jsonify({'username': user.username}), 201, {'Location': url_for('get_user', id=user.id, _external=True)})
+	return(jsonify({'username': user.username}), 201, {'Location': url_for('get_username', id=user.id, _external=True)})
 
 @app.route('/users/<int:id>')
 def get_username(id):
@@ -74,17 +85,27 @@ def get_userid(username):
 
 @app.route('/look')
 @auth.login_required
-def get_current_room():
-	return jsonify({'room_id': g.user.room.id, 'room_name': g.user.room.name, 'room_description': g.user.room.description})
+def get_current_location():
+	occupants=[]
+	for u in g.user.location.players:
+		occupants.append(u.username)
+	return jsonify({'location_id': g.user.location.id, 'location_name': g.user.location.name, 'location_description': g.user.location.description, 'users': occupants})
 
-@app.route('/resource')
+@app.route('/move', methods=['POST'])
 @auth.login_required
-def get_resource():
-	return jsonify({'data': 'Hello, %s' % g.user.username})
+def move():
+	user = g.user
+	direction = request.json.get('direction')
+	if direction is None:
+		abort(400)
+
+	# check exits - if possible, move there
+
+	return jsonify({'current_location': user.location_id}), 200, {'Look': url_for('get_current_location', _external=True)})
 
 @app.route('/')
 def hello():
-    return "Hello World!"
+    return "Welcome to PyMUD.  Login to continue."
 
 if __name__ == "__main__":
 	if not os.path.exists('db.sqlite'):
