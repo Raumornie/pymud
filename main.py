@@ -1,4 +1,5 @@
 import os
+import fileinput
 from flask import Flask, abort, request, jsonify, g, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
@@ -30,20 +31,20 @@ class User(db.Model):
 class Room(db.Model):
 	__tablename__='rooms'
 	id = db.Column(db.Integer, primary_key=True)
-	name = db.Column(db.String(64))
+	name = db.Column(db.String(64), index=True)
 	description = db.Column(db.Text)
 	players = db.relationship("User", order_by=User.id, back_populates="location")
-	exits = db.relationship("Exit", order_by=Exit.id, back_populates="source")
-	entrances = db.relationship("Exit", order_by=Exit.id, back_populates="destination")
+	exits = db.relationship("Portal", back_populates="source", foreign_keys="Portal.source_id")
+	entrances = db.relationship("Portal", back_populates="destination", foreign_keys="Portal.destination_id")
 
-class Exit(db.Model):
-	__tablename__='exits'
+class Portal(db.Model):
+	__tablename__='portals'
 	id = db.Column(db.Integer, primary_key=True)
-	direction = db.Column(db.string(16))
 	source_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
+	source = db.relationship("Room", back_populates="exits", foreign_keys="Portal.source_id")
+	direction = db.Column(db.String(16))
 	destination_id = db.Column(db.Integer, db.ForeignKey("rooms.id"))
-	source = db.relationship("Room", back_populates="exits")
-	destination = db.relationship("Room", back_populates="entrances")
+	destination = db.relationship("Room", back_populates="entrances", foreign_keys="Portal.destination_id")
 
 
 @auth.verify_password
@@ -74,7 +75,7 @@ def get_username(id):
 	user= User.query.get(id)
 	if not user:
 		abort(400)
-	return jsonify({'username': user.username})
+	return jsonify({'username': user.username, 'location':user.location.name})
 
 @app.route('/users/<string:username>')
 def get_userid(username):
@@ -101,17 +102,29 @@ def move():
 
 	# check exits - if possible, move there
 
-	return jsonify({'current_location': user.location_id}), 200, {'Look': url_for('get_current_location', _external=True)})
+	return (jsonify({'current_location': user.location_id}), 200, {'Look': url_for('get_current_location', _external=True)})
 
 @app.route('/')
 def hello():
     return "Welcome to PyMUD.  Login to continue."
 
+def load_map_from_text():
+	with open('map.txt') as f:
+		content = f.readlines()
+		for line in content:
+			tokens = line.split(',')
+			if tokens[0] == "Room":
+				room = Room(name=tokens[1].strip(' \n'), description=tokens[2].strip(' \n'))
+				db.session.add(room)
+				db.session.commit()
+			elif tokens[0] == "Portal":
+				portal = Portal(source=Room.query.filter_by(name=tokens[1].strip(' \n')).first(), direction=tokens[2].strip(' \n'), destination=Room.query.filter_by(name=tokens[3].strip(' \n')).first())
+				db.session.add(portal)
+				db.session.commit()
+
 if __name__ == "__main__":
 	if not os.path.exists('db.sqlite'):
 		db.create_all()
 	if not Room.query.filter_by(id=1).first():
-		room = Room(name="The Entrance", description="You are at the entrance to a very creepy dungeon.  You feel as though coming here may not have been a great idea.")
-		db.session.add(room)
-		db.session.commit()
+		load_map_from_text()
 	app.run(host='0.0.0.0')

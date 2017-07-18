@@ -1,0 +1,10 @@
+Room, The Entrance, You are at the entrance to a very creepy dungeon.  You feel as though coming here may not have been a great idea.
+Room, The Evil Kitchen, You are in a kitchen.  A very evil kitchen.  Various evil cooking implments are scattered about and the smell of an evil pie wafts out from what can only be the oven of the dammed.
+Room, The Dark Room, It is very dark in this room.  You are likely to be eaten by a grue.
+Room, The Empty Room, This room is empty.  Completely empty.  There's nothing scary or evil in it at all.  Nope.  Not a thing.
+Portal, The Entrance, South, The Empty Room
+Portal, The Empty Room, North, The Entrance
+Portal, The Empty Room, East, The Evil Kitchen
+Portal, The Empty Room, West, The Dark Room
+Portal, The Evil Kitchen, West, The Empty Room
+Portal, The Dark Room, East, The Empty Room
