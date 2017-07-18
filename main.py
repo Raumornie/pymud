@@ -88,9 +88,12 @@ def get_userid(username):
 @auth.login_required
 def get_current_location():
 	occupants=[]
+	exits=[]
 	for u in g.user.location.players:
 		occupants.append(u.username)
-	return jsonify({'location_id': g.user.location.id, 'location_name': g.user.location.name, 'location_description': g.user.location.description, 'users': occupants})
+	for e in g.user.location.exits:
+		exits.append(e.direction)
+	return jsonify({'location_id': g.user.location.id, 'location_name': g.user.location.name, 'location_description': g.user.location.description, 'location_exits': exits, 'users': occupants})
 
 @app.route('/move', methods=['POST'])
 @auth.login_required
@@ -99,10 +102,16 @@ def move():
 	direction = request.json.get('direction')
 	if direction is None:
 		abort(400)
-
-	# check exits - if possible, move there
-
-	return (jsonify({'current_location': user.location_id}), 200, {'Look': url_for('get_current_location', _external=True)})
+	available_directions=[]
+	message=""
+	for e in user.location.exits:
+		available_directions.append(e.direction)
+	if not direction in available_directions:
+		message = "You can't go that way."
+	else:
+		user.location=(Portal.query.filter_by(source=user.location, direction=direction).first()).destination
+		message = "Move successful"
+	return (jsonify({'message': message}), 200, {'Look': url_for('get_current_location', _external=True)})
 
 @app.route('/')
 def hello():
